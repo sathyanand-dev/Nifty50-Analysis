@@ -28,13 +28,20 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.title('Nifty50 stock comparative analysis')
+
 # Display image
 image = "https://img.etimg.com/thumb/msid-79611089,width-1015,height-550,imgsize-299518,resizemode-8/prime/money-and-markets/is-nifty-overvalued-a-short-term-correction-may-settle-the-debate-.jpg"  # Replace with the path to your image file
 st.image(image, use_column_width=True)
 
-# Define a list of stock tickers
-start_date = st.date_input('Start Date', value=pd.to_datetime('2010-01-01'))
-end_date = st.date_input('End Date', value=pd.to_datetime('2022-12-31'))
+
+# Render the date inputs with modified label text
+font_size = 28
+st.markdown(f"<label style='font-size: {font_size}px;'>Start Date</label>", unsafe_allow_html=True)
+start_date = st.date_input('', value=pd.to_datetime('2020-01-01'), key='start_date')
+st.markdown(f"<label style='font-size: {font_size}px;'>End Date</label>", unsafe_allow_html=True)
+end_date = st.date_input('', value=pd.to_datetime('2022-12-31'), key='end_date')
+
 
 start = start_date.strftime("%Y-%m-%d")
 end = end_date.strftime("%Y-%m-%d")
@@ -152,35 +159,6 @@ df = yf.download(selected_ticker, start=start, end=end).reset_index()
 st.subheader('Data Description')
 st.write(df.describe())
 
-#Visualization
-st.subheader('Closing price vs Time chart')
-fig=plt.figure(figsize=(12,6))
-plt.plot(df.Close)
-st.pyplot(fig)
-
-st.subheader('Closing price vs Time chart with 100MA')
-ma100=df.Close.rolling(100).mean()
-fig=plt.figure(figsize=(12,6))
-plt.plot(ma100)
-plt.plot(df.Close)
-st.pyplot(fig)
-
-st.subheader('Closing price vs Time chart with 100MA & 200MA')
-ma100=df.Close.rolling(100).mean()
-ma200=df.Close.rolling(200).mean()
-fig=plt.figure(figsize=(12,6))
-plt.plot(ma100,'r')
-plt.plot(ma200,'g')
-plt.plot(df.Close,'b')
-st.pyplot(fig)
-
-# Calculate RSI
-rsi = ta.momentum.RSIIndicator(df.Close).rsi()
-
-# Add RSI subplot
-fig.add_subplot().plot(rsi, 'purple')
-
-st.pyplot(fig)
 
 s='2010-01-01'
 e='2022-12-31'
@@ -255,8 +233,55 @@ plt.ylabel('Price')
 plt.legend()
 st.pyplot(fig2)
 
-df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
-# Create HLC Bar Chart with RSI
+
+# Calculate Bollinger Bands
+st.subheader('Bollinger Bands Chart')
+indicator_bb = ta.volatility.BollingerBands(close=df['Close'], window=20, window_dev=2)
+bb_middle = indicator_bb.bollinger_mavg()
+bb_upper = indicator_bb.bollinger_hband()
+bb_lower = indicator_bb.bollinger_lband()
+
+# Create Bollinger Bands Chart
+bb_fig = go.Figure()
+
+bb_fig.add_trace(go.Scatter(
+    x=df['Date'],
+    y=bb_middle,
+    name='Middle Band',
+    line=dict(color='blue')
+))
+
+bb_fig.add_trace(go.Scatter(
+    x=df['Date'],
+    y=bb_upper,
+    name='Upper Band',
+    line=dict(color='orange')
+))
+
+bb_fig.add_trace(go.Scatter(
+    x=df['Date'],
+    y=bb_lower,
+    name='Lower Band',
+    line=dict(color='orange')
+))
+
+bb_fig.update_layout(
+    xaxis_title='Date',
+    yaxis_title='Price',
+    template='plotly_white'
+)
+
+# Show the Bollinger Bands chart using Streamlit's st.plotly_chart function
+st.plotly_chart(bb_fig, use_container_width=True)
+
+# Calculate Technical Indicators
+st.subheader('HLC Candlestick Chart with Technical Indicators')
+rsi = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
+macd = ta.trend.MACD(close=df['Close']).macd()
+ema_short = ta.trend.EMAIndicator(close=df['Close'], window=20).ema_indicator()
+ema_long = ta.trend.EMAIndicator(close=df['Close'], window=50).ema_indicator()
+
+# Create HLC Bar Chart with Technical Indicators
 fig = go.Figure()
 
 fig.add_trace(go.Candlestick(
@@ -272,60 +297,119 @@ fig.add_trace(go.Candlestick(
 
 fig.add_trace(go.Scatter(
     x=df['Date'],
-    y=df['RSI'],
+    y=rsi,
     name='RSI',
     line=dict(color='blue')
 ))
 
+fig.add_trace(go.Scatter(
+    x=df['Date'],
+    y=macd,
+    name='MACD',
+    line=dict(color='orange')
+))
+
+fig.add_trace(go.Scatter(
+    x=df['Date'],
+    y=ema_short,
+    name='EMA Short',
+    line=dict(color='purple')
+))
+
+fig.add_trace(go.Scatter(
+    x=df['Date'],
+    y=ema_long,
+    name='EMA Long',
+    line=dict(color='pink')
+))
+
 fig.update_layout(
-    title='HLC Bar Chart with RSI',
     xaxis_title='Date',
     yaxis_title='Price',
     template='plotly_white'
 )
+
 # Show the chart using Streamlit's st.plotly_chart function
 st.plotly_chart(fig, use_container_width=True)
 
+#Visualization
+st.subheader('Closing price vs Time chart')
+fig=plt.figure(figsize=(12,6))
+plt.plot(df.Close)
+st.pyplot(fig)
+
+st.subheader('Closing price vs Time chart with 100MA')
+ma100=df.Close.rolling(100).mean()
+fig=plt.figure(figsize=(12,6))
+plt.plot(ma100)
+plt.plot(df.Close)
+st.pyplot(fig)
+
+st.subheader('Closing price vs Time chart with 100MA & 200MA')
+ma100=df.Close.rolling(100).mean()
+ma200=df.Close.rolling(200).mean()
+fig=plt.figure(figsize=(12,6))
+plt.plot(ma100,'r')
+plt.plot(ma200,'g')
+plt.plot(df.Close,'b')
+st.pyplot(fig)
+
+
+# Calculate RSI
+st.subheader('RSI Value Indicator')
+rsi = ta.momentum.RSIIndicator(df.Close).rsi()
+# Add RSI subplot
+fig.add_subplot().plot(rsi, 'purple')
+st.pyplot(fig)
+
 # User input for plot selection
-plot_choice = st.selectbox('Comparision Plots for Open,Close,High,Low,Adj Close,Volume', ('Opening value vs Closing',
+st.subheader('Comparision Plots for Open, Close, High, Low, Adj Close and Volume')
+plot_choice = st.selectbox(' ', ('Opening value vs Closing',
                                      'Highest value vs Closing', 'Lowest value vs Closing',
-                                     'Volume vs Closing', 'Date vs Volume','Closing VS Adj Close'), index=0)
+                                      'Date vs Volume','Closing VS Adj Close'), index=0)
 load = st.progress(0)
 style.use('ggplot')
 
 if plot_choice == 'Closing VS Adj Close':
-    fig=plt.figure(figsize=(12,6))
-    plt.plot(df['Close'], df['Adj Close'], c='b')
-    plt.xlabel('Close')
-    plt.ylabel('Adj Close')
+    fig = plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['Close'], label='Close', c='b')
+    plt.plot(df.index, df['Adj Close'], label='Adj Close', c='r')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
     plt.title('Closing Value vs Adj Closing')
+    plt.legend()
     st.pyplot(fig)
+
 elif plot_choice == 'Opening value vs Closing':
-    fig=plt.figure(figsize=(12,6))
-    plt.plot(df['Open'], df['Close'], c='b')
-    plt.xlabel('Open')
-    plt.ylabel('Close')
+    fig = plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['Open'], label='Open', c='b')
+    plt.plot(df.index, df['Close'], label='Close', c='r')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
     plt.title('Opening value vs Closing')
+    plt.legend()
     st.pyplot(fig)
+
 elif plot_choice == 'Highest value vs Closing':
-    fig=plt.figure(figsize=(12,6))
-    plt.plot(df['High'], df['Close'], c='g')
-    plt.xlabel('Highest value')
-    plt.ylabel('Close')
+    fig = plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['High'], label='High', c='g')
+    plt.plot(df.index, df['Close'], label='Close', c='b')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
     plt.title('Highest value vs Closing')
+    plt.legend()
     st.pyplot(fig)
+
 elif plot_choice == 'Lowest value vs Closing':
-    fig=plt.figure(figsize=(12,6))
-    plt.plot(df['Low'], df['Close'], c='c')
-    plt.xlabel('Lowest value')
-    plt.ylabel('Close')
+    fig = plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['Low'], label='Lowest value', c='c')
+    plt.plot(df.index, df['Close'], label='Close', c='b')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
+    plt.title('Lowest value vs Closing')
+    plt.legend()
     st.pyplot(fig)
-elif plot_choice == 'Volume vs Closing':
-    fig=plt.figure(figsize=(12,6))
-    plt.plot(df['Volume'], df['Close'], c='c')
-    plt.xlabel('Volume')
-    plt.ylabel('Close')
-    st.pyplot(fig)
+
 elif plot_choice == 'Date vs Volume':
     fig=plt.figure(figsize=(12,6))
     plt.plot(df['Date'], df['Volume'], c='c')
